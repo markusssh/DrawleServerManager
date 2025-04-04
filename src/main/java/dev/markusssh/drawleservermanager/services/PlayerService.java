@@ -5,6 +5,8 @@ import dev.markusssh.drawleservermanager.redis.repository.PlayerRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class PlayerService {
     private static final String PLAYER_ID_SEQUENCE = "player:id:sequence";
@@ -25,5 +27,9 @@ public class PlayerService {
         player.setName(name);
         player.setLobbyId(lobbyId);
         return playerRepository.save(player);
+    }
+
+    public Optional<Player> getPlayerById(Long playerId) {
+        return playerRepository.findById(playerId);
     }
 }

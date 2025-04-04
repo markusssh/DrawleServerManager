@@ -5,3 +5,11 @@ spring:
     redis:
       host: redis
       port: 6379
+
+jwt:
+  secret: f1b255fbcc5dea003488f7880d8128e769064f4781f3fe61184bfe332272ef67
+  expiration: 86400000
+
+game:
+  server:
+    token: 4791da355540b0cd33420b55c066802dd09998d8a2c5a44667ee4ccc5a625e25

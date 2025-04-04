@@ -16,6 +16,7 @@ public class Lobby {
 
     @Id
     private Long id;
+    private int playerCount;
     private int maxPlayers;
     private int playTime;
     private Long creatorId;

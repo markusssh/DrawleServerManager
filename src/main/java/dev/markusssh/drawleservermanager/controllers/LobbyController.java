@@ -5,6 +5,8 @@ import dev.markusssh.drawleservermanager.dtos.RegisterLobbyRequest;
 import dev.markusssh.drawleservermanager.dtos.ServerVerification;
 import dev.markusssh.drawleservermanager.services.LobbyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +15,9 @@ import org.springframework.web.bind.annotation.*;
 public class LobbyController {
 
     private final LobbyService lobbyService;
+
+    @Value("${game.server.token}")
+    private String token;
 
     @Autowired
     public LobbyController(
@@ -28,29 +33,32 @@ public class LobbyController {
 
     @PostMapping("join-lobby")
     private ResponseEntity<?> joinLobby(@RequestBody JoinLobbyRequest req) {
-        var res = lobbyService.joinLobby(req);
-        if (res == null) { return ResponseEntity.badRequest().build(); }
-        return ResponseEntity.ok(res);
+        try {
+            var res = lobbyService.joinLobby(req);
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
     }
 
     @GetMapping
     private ResponseEntity<?> getLobby(@RequestParam long lobbyId, @RequestBody ServerVerification verification) {
-        if (verificationFailed(verification)) return ResponseEntity.badRequest().build();
-        var res = lobbyService.getLobbyById(lobbyId);
-        if (res == null) { return ResponseEntity.notFound().build(); }
+        if (verificationFailed(verification)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        var resOptional = lobbyService.getLobbyById(lobbyId);
+        if (resOptional.isEmpty()) { return ResponseEntity.notFound().build(); }
+        var res = resOptional.get();
         return ResponseEntity.ok(res);
     }
 
     @DeleteMapping
     private ResponseEntity<?> deleteLobby(@RequestParam long lobbyId, @RequestBody ServerVerification verification) {
-        if (verificationFailed(verification)) return ResponseEntity.badRequest().build();
+        if (verificationFailed(verification)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         lobbyService.deleteLobbyById(lobbyId);
         return ResponseEntity.ok().build();
     }
 
     private boolean verificationFailed(ServerVerification verification) {
-        //PLACEHOLDER
-        return !verification.token().equals("1234");
+        return !verification.token().equals(token);
     }
 }
 
