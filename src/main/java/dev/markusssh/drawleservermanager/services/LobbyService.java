@@ -2,6 +2,7 @@ package dev.markusssh.drawleservermanager.services;
 
 import dev.markusssh.drawleservermanager.dtos.JoinLobbyRequest;
 import dev.markusssh.drawleservermanager.dtos.JoinLobbyResponse;
+import dev.markusssh.drawleservermanager.dtos.JwtValidationResult;
 import dev.markusssh.drawleservermanager.dtos.RegisterLobbyRequest;
 import dev.markusssh.drawleservermanager.redis.entity.Lobby;
 import dev.markusssh.drawleservermanager.redis.entity.Player;
@@ -21,6 +22,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -34,6 +36,15 @@ public class LobbyService {
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    @Value("${lobby.pending.ttl:300}")
+    private long pendingLobbyTtl;
+
+    @Value("${lobby.active.ttl:7200}")
+    private long activeLobbyTtl;
+
+    @Value("${lobby.max-per-ip:5}")
+    private int maxPendingLobbiesPerIp;
 
     private final PlayerService playerService;
     private final LobbyRepository lobbyRepository;
@@ -62,7 +73,17 @@ public class LobbyService {
                 .compact();
     }
 
-    public JoinLobbyResponse createLobby(RegisterLobbyRequest req) {
+    public JoinLobbyResponse createLobby(RegisterLobbyRequest req, String clientIp) {
+        String pendingLobbiesKey = "pending:lobbies:" + clientIp;
+        Long pendingCount = redisTemplate.opsForValue().increment(pendingLobbiesKey, 1);
+
+        if (pendingCount != null && pendingCount > maxPendingLobbiesPerIp) {
+            redisTemplate.opsForValue().decrement(pendingLobbiesKey);
+            throw new RuntimeException("Too many lobbies. Please try again later.");
+        }
+
+        redisTemplate.expire(pendingLobbiesKey, pendingLobbyTtl, TimeUnit.SECONDS);
+
         Long lobbyId = redisTemplate.opsForValue().increment(LOBBY_ID_SEQUENCE);
 
         Player player = playerService.createPlayer(req.creatorName(), lobbyId);
@@ -74,6 +95,8 @@ public class LobbyService {
         lobby.setMaxPlayers(validateMaxPlayers(req.maxPlayers()));
         lobby.setCreatorId(playerId);
         lobby.setPlayerCount(1);
+        lobby.setStatus(Lobby.Status.PENDING);
+        lobby.setTtl(pendingLobbyTtl);
         lobbyRepository.save(lobby);
 
         var serverConData = ServerManagerService.getConnectionData();
@@ -98,6 +121,10 @@ public class LobbyService {
             throw new IllegalArgumentException("Invalid lobby id");
         }
         var lobby = lobbyOptional.get();
+
+        if (lobby.getStatus() != Lobby.Status.ACTIVE) {
+            throw new IllegalArgumentException("Lobby is not active yet");
+        }
 
         int playerCount = lobby.getPlayerCount();
         if (playerCount < lobby.getMaxPlayers()) {
@@ -130,27 +157,52 @@ public class LobbyService {
         }
     }
 
-    public boolean validateJwtToken(String token) {
+    public boolean confirmLobby(Long lobbyId, Long playerId) {
+        var lobbyOptional = lobbyRepository.findById(lobbyId);
+        if (lobbyOptional.isEmpty()) { return false; }
+
+        var lobby = lobbyOptional.get();
+        if (lobby.getCreatorId().equals(playerId)) {
+            lobby.setStatus(Lobby.Status.ACTIVE);
+            lobby.setTtl(activeLobbyTtl);
+            lobbyRepository.save(lobby);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public void closeLobby(Long lobbyId) {
+        var lobbyOptional = lobbyRepository.findById(lobbyId);
+        if (lobbyOptional.isPresent()) {
+            var lobby = lobbyOptional.get();
+            lobby.setStatus(Lobby.Status.CLOSED);
+            lobby.setTtl(60L);
+            lobbyRepository.save(lobby);
+        }
+    }
+
+    public JwtValidationResult validateJwtToken(String token) {
         try {
             Long playerId = parseJwtToken(token);
-            if (playerId == null) { return false; }
+            if (playerId == null) { return JwtValidationResult.invalid("PlayerId is null"); }
 
             var playerOptional = playerService.getPlayerById(playerId);
-            if (playerOptional.isEmpty()) { return false; }
+            if (playerOptional.isEmpty()) { return JwtValidationResult.invalid("Player not found"); }
             var player = playerOptional.get();
 
             var lobbyOptional = getLobbyById(player.getLobbyId());
-            return lobbyOptional.isPresent();
+            if (lobbyOptional.isEmpty()) { return JwtValidationResult.invalid("Lobby not found"); }
+            var lobbyId = lobbyOptional.get().getId();
+
+            return JwtValidationResult.valid(playerId, lobbyId, player.getName());
         } catch (Exception e) {
-            return false;
+            return JwtValidationResult.invalid(e.getMessage());
         }
     }
 
     public Optional<Lobby> getLobbyById(Long lobbyId) {
         return lobbyRepository.findById(lobbyId);
-    }
-
-    public void deleteLobbyById(Long lobbyId) {
-        lobbyRepository.deleteById(lobbyId);
     }
 }

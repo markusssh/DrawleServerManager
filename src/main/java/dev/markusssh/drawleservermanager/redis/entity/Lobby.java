@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.TimeToLive;
 
 @RedisHash("lobby")
 @Getter
@@ -14,10 +15,20 @@ public class Lobby {
     public static final int MIN_PLAYERS = 3;
     public static final int MAX_PLAYERS = 10;
 
+    public enum Status {
+        PENDING,
+        ACTIVE,
+        CLOSED
+    }
+
     @Id
     private Long id;
     private int playerCount;
     private int maxPlayers;
     private int playTime;
     private Long creatorId;
+    private Status status = Status.PENDING;
+
+    @TimeToLive
+    private Long ttl;
 }
