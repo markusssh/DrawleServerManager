@@ -1,9 +1,6 @@
 package dev.markusssh.drawleservermanager.services;
 
-import dev.markusssh.drawleservermanager.dtos.JoinLobbyRequest;
-import dev.markusssh.drawleservermanager.dtos.JoinLobbyResponse;
-import dev.markusssh.drawleservermanager.dtos.JwtValidationResult;
-import dev.markusssh.drawleservermanager.dtos.RegisterLobbyRequest;
+import dev.markusssh.drawleservermanager.dtos.*;
 import dev.markusssh.drawleservermanager.redis.entity.Lobby;
 import dev.markusssh.drawleservermanager.redis.entity.Player;
 import dev.markusssh.drawleservermanager.redis.repository.LobbyRepository;
@@ -157,9 +154,9 @@ public class LobbyService {
         }
     }
 
-    public boolean confirmLobby(Long lobbyId, Long playerId) {
+    public ConfirmLobbyResult confirmLobby(Long lobbyId, Long playerId) {
         var lobbyOptional = lobbyRepository.findById(lobbyId);
-        if (lobbyOptional.isEmpty()) { return false; }
+        if (lobbyOptional.isEmpty()) { return null; }
 
         var lobby = lobbyOptional.get();
         if (lobby.getCreatorId().equals(playerId)) {
@@ -167,10 +164,14 @@ public class LobbyService {
             lobby.setTtl(activeLobbyTtl);
             lobbyRepository.save(lobby);
 
-            return true;
+            return new ConfirmLobbyResult(
+                    lobby.getId(),
+                    lobby.getCreatorId(),
+                    lobby.getPlayTime(),
+                    lobby.getMaxPlayers());
         }
 
-        return false;
+        return null;
     }
 
     public void closeLobby(Long lobbyId) {

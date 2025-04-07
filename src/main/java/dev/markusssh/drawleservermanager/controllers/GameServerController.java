@@ -43,9 +43,9 @@ public class GameServerController {
             @RequestHeader("Authorization") String authHeader) {
         if (invalidAuth(authHeader)) { return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); }
 
-        boolean success = lobbyService.confirmLobby(req.lobbyId(), req.playerId());
-        if (success) {
-            return ResponseEntity.ok().build();
+        var res = lobbyService.confirmLobby(req.lobbyId(), req.playerId());
+        if (res != null) {
+            return ResponseEntity.status(HttpStatus.OK).body(res);
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Lobby or player not found");
         }
