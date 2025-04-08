@@ -62,9 +62,9 @@ public class GameServerController {
     }
 
     private boolean invalidAuth(String auth) {
-        if (!auth.startsWith("Bearer ") || !(auth.length() == 7)) return false;
+        if (!auth.startsWith("Bearer ")) return true;
         String token = auth.substring(7);
-        return token.equals(this.token);
+        return !token.equals(this.token);
     }
 
 }

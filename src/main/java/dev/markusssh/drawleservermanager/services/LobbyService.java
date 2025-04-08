@@ -27,9 +27,12 @@ public class LobbyService {
 
     private static final String LOBBY_ID_SEQUENCE = "lobby:id:sequence";
 
+    private SecretKey key;
+
     @Value("${jwt.secret}")
-    private String jwtSecret;
-    private final SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    public void setJwtSecret(String jwtSecret) {
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
