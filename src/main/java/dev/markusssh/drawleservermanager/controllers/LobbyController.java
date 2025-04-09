@@ -26,8 +26,12 @@ public class LobbyController {
             @RequestBody RegisterLobbyRequest req,
             HttpServletRequest servletRequest) {
         String clientIp = getClientIp(servletRequest);
-        var res = lobbyService.createLobby(req, clientIp);
-        return ResponseEntity.ok(res);
+        try {
+            var res = lobbyService.createLobby(req, clientIp);
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(e.getMessage());
+        }
     }
 
     @PostMapping("join-lobby")
