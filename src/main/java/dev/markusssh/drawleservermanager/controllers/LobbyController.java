@@ -4,11 +4,13 @@ import dev.markusssh.drawleservermanager.dtos.JoinLobbyRequest;
 import dev.markusssh.drawleservermanager.dtos.RegisterLobbyRequest;
 import dev.markusssh.drawleservermanager.services.LobbyService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("lobby")
 public class LobbyController {
@@ -30,6 +32,7 @@ public class LobbyController {
             var res = lobbyService.createLobby(req, clientIp);
             return ResponseEntity.ok(res);
         } catch (RuntimeException e) {
+            log.warn("To many requests from {}", clientIp);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(e.getMessage());
         }
     }

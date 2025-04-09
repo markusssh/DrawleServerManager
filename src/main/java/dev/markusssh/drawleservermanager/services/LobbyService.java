@@ -15,10 +15,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -74,15 +71,17 @@ public class LobbyService {
     }
 
     public JoinLobbyResponse createLobby(RegisterLobbyRequest req, String clientIp) {
-        String pendingLobbiesKey = "pending:lobbies:" + clientIp;
-        Long pendingCount = redisTemplate.opsForValue().increment(pendingLobbiesKey, 1);
+        if (!Objects.equals(clientIp, "0:0:0:0:0:0:0:1")) {
+            String pendingLobbiesKey = "pending:lobbies:" + clientIp;
+            Long pendingCount = redisTemplate.opsForValue().increment(pendingLobbiesKey, 1);
 
-        if (pendingCount != null && pendingCount > maxPendingLobbiesPerIp) {
-            redisTemplate.opsForValue().decrement(pendingLobbiesKey);
-            throw new RuntimeException("Too many lobbies. Please try again later.");
+            if (pendingCount != null && pendingCount > maxPendingLobbiesPerIp) {
+                redisTemplate.opsForValue().decrement(pendingLobbiesKey);
+                throw new RuntimeException("Too many lobbies. Please try again later.");
+            }
+
+            redisTemplate.expire(pendingLobbiesKey, pendingLobbyTtl, TimeUnit.SECONDS);
         }
-
-        redisTemplate.expire(pendingLobbiesKey, pendingLobbyTtl, TimeUnit.SECONDS);
 
         Long lobbyId = redisTemplate.opsForValue().increment(LOBBY_ID_SEQUENCE);
 
